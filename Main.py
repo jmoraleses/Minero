@@ -401,8 +401,8 @@ def show_numbers(cor):
 
 
 def create_nonces(first_nonce):
-    ini_nonce = long(first_nonce + "00000", 16)
-    fin_nonce = long(first_nonce + "fffff", 16) + 1
+    ini_nonce = long(first_nonce.zfill(3) + "00000", 16)
+    fin_nonce = long(first_nonce.zfill(3) + "fffff", 16) + 1
     me_nonce = ini_nonce
     list_nonces = []
     # ini = time.time()
@@ -418,7 +418,7 @@ def search_hash_valid(list_nonces, block_header, target_hash):
         lista = list_nonces[i]
         for x in range(len(lista)):
             nonce = lista[x][2:]
-            block_header2 = block_header + bytes.fromhex(nonce)###
+            block_header2 = block_header + bytes.fromhex(nonce)
             block_hash = block_compute_raw_hash(block_header2)
             if block_hash < target_hash:
                 print("Nonce encontrado:")
