@@ -1,3 +1,4 @@
+import math
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -10,19 +11,23 @@ import time
 import os
 import sys
 import codecs
-import tensorflow as tf
 import numpy as np
 import pandas as pd
 import binascii
 from binascii import unhexlify
-import codecs
+# from numba import cuda, njit, jit
+import numba
+from numba import cuda, jit, njit
+from numpy.compat import long
 
 # JSON-HTTP RPC Configuration
 # This will be particular to your local ~/.bitcoin/bitcoin.conf
 
+
 RPC_URL = os.environ.get("RPC_URL", "http://127.0.0.1:18332")
 RPC_USER = os.environ.get("RPC_USER", "prueba")
 RPC_PASS = os.environ.get("RPC_PASS", "prueba")
+
 
 ################################################################################
 # Bitcoin Daemon JSON-HTTP RPC
@@ -214,6 +219,8 @@ def little_to_big(value):
     s = ''.join(format(x, '02x') for x in ba)
     return s
 
+
+
 def block_compute_raw_hash(header):
     """
     Compute the raw SHA256 double hash of a block header.
@@ -313,7 +320,7 @@ def block_make_header(block):
     # Target Bits
     header += bytes.fromhex(block['bits'])[::-1]
     # Nonce
-    header += block['nonce'] #struct.pack("<L", block['nonce'])
+    header += block['nonce']  # struct.pack("<L", block['nonce'])
 
     return header
 
@@ -347,8 +354,8 @@ def block_make_submit(block):
 
     return submission
 
-def switch_int_to_h(number):
 
+def switch_int_to_h(number):
     if number == 10:
         h = 'a'
     elif number == 11:
@@ -383,6 +390,7 @@ def false_to_numbers(cor):
                 f += switch_int_to_h(z)
     return f
 
+
 def show_numbers(cor):
     f = ""
     for j in range(8):
@@ -391,36 +399,33 @@ def show_numbers(cor):
                 f += switch_int_to_h(z)
     return f
 
-def search_nonce(first_nonce, block_header, target_hash):
-    ini = time.time()
-    for a in range(16):  # 1
-        a_hex = switch_int_to_h(a)
-        for b in range(16):  # 2
-            b_hex = switch_int_to_h(b)
-            for c in range(16):  # 3
-                c_hex = switch_int_to_h(c)
-                for d in range(16):  # 4
-                    d_hex = switch_int_to_h(d)
-                    for e in range(16):  # 5
-                        e_hex = switch_int_to_h(e)
-                        me_nonce = first_nonce + a_hex + b_hex + c_hex + d_hex + e_hex
-                        nonce = me_nonce.zfill(8)
-                        # me_nonce = tx_compute_hash(codecs.encode(bytes.fromhex(me_nonce)[::-1], "hex").decode('ascii'))
-                        # me_hash = tx_compute_hash(little_to_big(me_nonce))
-                        block_header = block_header[:-4] + bytes.fromhex(nonce)
-                        block_hash = block_compute_raw_hash(block_header)
-                        if block_hash < target_hash:
-                            fin = time.time()
-                            print("Nonce encontrado:")
-                            print(nonce)
-                            print("Ejecución: {}".format(fin - ini))
-                            return nonce
-                            # block_template['nonce'] = nonce
-                            # block_template['hash'] = block_hash.hex()
-                            # return block_template
-    fin = time.time()
-    print("Ejecución: {}".format(fin - ini))
-    return first_nonce
+
+def create_nonces(first_nonce, block_header, target_hash):
+    ini_nonce = long(first_nonce + "00000", 16)
+    fin_nonce = long(first_nonce + "fffff", 16) + 1
+    me_nonce = ini_nonce
+    list_nonces = []
+    # ini = time.time()
+    while me_nonce < fin_nonce:
+        nonce = hex(me_nonce).zfill(8)
+        list_nonces.append(nonce)
+        me_nonce += 1
+    return list_nonces
+
+
+
+def search_hash_valid(list_nonces, block_header, target_hash):
+    for i in range(len(list_nonces)):
+        lista = list_nonces[i]
+        for x in range(len(lista)):
+            nonce = lista[x]
+            block_header2 = block_header + bytes.fromhex(nonce)
+            block_hash = block_compute_raw_hash(block_header2)
+            if block_hash < target_hash:
+                print("Nonce encontrado:")
+                print(nonce)
+                return nonce
+    return None
 
 
 def miner(coinbase_message, address, df_first_nonce):
@@ -432,27 +437,35 @@ def miner(coinbase_message, address, df_first_nonce):
     block_template['nonce'] = unhexlify(b"00000000")
     target_hash = block_bits2target(block_template['bits'])
     coinbase_script = to_do_coinbase_message(coinbase_message, block_template['height'])
-    coinbase_tx['data'] = tx_make_coinbase(coinbase_script, address, block_template['coinbasevalue'], block_template['height'])
+    coinbase_tx['data'] = tx_make_coinbase(coinbase_script, address, block_template['coinbasevalue'],
+                                           block_template['height'])
     coinbase_tx['hash'] = tx_compute_hash(coinbase_tx['data'])
     block_template['merkleroot'] = tx_compute_merkle_root([tx['hash'] for tx in block_template['transactions']])
     block_header = block_make_header(block_template)
-
-    #Buscar nonce
     # my_block_header = str(block_header.hex())
     # print(my_block_header)
-    me_nonce = ""
+
+    # create list nonces
+    list_nonces = []
     for i in range(len(df_first_nonce)):
-        first_nonce = df_first_nonce.iloc[i][0]
-        print(first_nonce)
-        me_nonce = search_nonce(first_nonce, block_header, target_hash)
-    if me_nonce == df_first_nonce.iloc[-1][0]:
+        first_nonces = df_first_nonce.iloc[i][0]
+        list_nonces.append(create_nonces(first_nonces, block_header, target_hash))
+    print("Lista de nonces creados...")
+
+
+    # search hash valid
+    ini = time.time()
+    me_nonce = search_hash_valid(list_nonces, block_header[:-4], target_hash)
+    if me_nonce == None:
         return None
+    fin = time.time()
+    print("Ejecución: {}".format(fin - ini))
 
     block_header = block_header[:-4] + bytes.fromhex(me_nonce)
     block_hash = block_compute_raw_hash(block_header)
-    print(codecs.encode(block_header, "hex").decode())
-    print(codecs.encode(block_hash, "hex").decode())
-    print()
+    # print(codecs.encode(block_header, "hex").decode())
+    # print(codecs.encode(block_hash, "hex").decode())
+    # print()
     if block_hash < target_hash:
         block_template['nonce'] = me_nonce
         block_template['hash'] = block_hash.hex()
@@ -470,8 +483,9 @@ if __name__ == "__main__":
     while True:
         # mined_block = miner(sys.argv[1].encode().hex(), sys.argv[2], df_first_nonce)
 
-        mined_block = miner("pio, pio, pio, en el arbol de la vida[!]".encode().hex(), "bc1qsrn2h3arjgurndtvp3w9ysse82ql2gtavz96x7", df_first_nonce)
-
+        mined_block = miner(":Mined by javi784ommig800 Q~c^xM,)bX&amp;gt;{#".encode().hex(),
+                            "tb1q5f2jdp006qp4q0qu8uq0ut0zh8lymwnvafy3rv", df_first_nonce)
+        # ":binance/8413]nmm}dqԡފ==ډ[BŉQXj"
 
         if mined_block:
             print("Solved a block! Block hash: {}".format(mined_block['hash']))
@@ -482,4 +496,3 @@ if __name__ == "__main__":
             if response is not None:
                 print("Submission Error: {}".format(response))
                 # break
-
