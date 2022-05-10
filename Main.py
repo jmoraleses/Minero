@@ -220,7 +220,6 @@ def little_to_big(value):
     return s
 
 
-
 def block_compute_raw_hash(header):
     """
     Compute the raw SHA256 double hash of a block header.
@@ -417,7 +416,7 @@ def search_hash_valid(list_nonces, block_header, target_hash):
     for i in range(len(list_nonces)):
         lista = list_nonces[i]
         for x in range(len(lista)):
-            nonce = lista[x][2:]
+            nonce = lista[x][2:].zfill(8)
             block_header2 = block_header + bytes.fromhex(nonce)
             block_hash = block_compute_raw_hash(block_header2)
             if block_hash < target_hash:
@@ -481,10 +480,9 @@ if __name__ == "__main__":
     print("Welcome to bit!")
     while True:
         # mined_block = miner(sys.argv[1].encode().hex(), sys.argv[2], df_first_nonce)
-
-        mined_block = miner(":Mined by javi784ommig800 Q~c^xM,)bX&amp;gt;{#".encode().hex(),
-                            "tb1q5f2jdp006qp4q0qu8uq0ut0zh8lymwnvafy3rv", list_nonces)
         # ":binance/8413]nmm}dqԡފ==ډ[BŉQXj"
+        mined_block = miner(":Mined by javi784ommig800 Q~c^xM,)bX&amp;gt;{#".encode().hex(),
+                            "DSjimaLrFFgwLHxBigNUG2M1L4DK9c2cRt", list_nonces)
 
         if mined_block:
             print("Solved a block! Block hash: {}".format(mined_block['hash']))
