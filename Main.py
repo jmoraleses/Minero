@@ -400,7 +400,7 @@ def show_numbers(cor):
     return f
 
 
-def create_nonces(first_nonce, block_header, target_hash):
+def create_nonces(first_nonce):
     ini_nonce = long(first_nonce + "00000", 16)
     fin_nonce = long(first_nonce + "fffff", 16) + 1
     me_nonce = ini_nonce
@@ -413,13 +413,12 @@ def create_nonces(first_nonce, block_header, target_hash):
     return list_nonces
 
 
-
 def search_hash_valid(list_nonces, block_header, target_hash):
     for i in range(len(list_nonces)):
         lista = list_nonces[i]
         for x in range(len(lista)):
-            nonce = lista[x]
-            block_header2 = block_header + bytes.fromhex(nonce)
+            nonce = lista[x][2:]
+            block_header2 = block_header + bytes.fromhex(nonce)###
             block_hash = block_compute_raw_hash(block_header2)
             if block_hash < target_hash:
                 print("Nonce encontrado:")
@@ -428,7 +427,7 @@ def search_hash_valid(list_nonces, block_header, target_hash):
     return None
 
 
-def miner(coinbase_message, address, df_first_nonce):
+def miner(coinbase_message, address, list_nonces):
     # while True:
     block_template = rpc_getblocktemplate()
     print("Mining block template, height {:d}...".format(block_template['height']))
@@ -444,14 +443,6 @@ def miner(coinbase_message, address, df_first_nonce):
     block_header = block_make_header(block_template)
     # my_block_header = str(block_header.hex())
     # print(my_block_header)
-
-    # create list nonces
-    list_nonces = []
-    for i in range(len(df_first_nonce)):
-        first_nonces = df_first_nonce.iloc[i][0]
-        list_nonces.append(create_nonces(first_nonces, block_header, target_hash))
-    print("Lista de nonces creados...")
-
 
     # search hash valid
     ini = time.time()
@@ -479,12 +470,20 @@ if __name__ == "__main__":
     # if len(sys.argv) < 3:
     #     print("Usage: {:s} <coinbase message> <block reward address>".format(sys.argv[0]))
     #     sys.exit(1)
+
+    # create list nonces
+    list_nonces = []
+    for i in range(len(df_first_nonce)):
+        first_nonces = df_first_nonce.iloc[i][0]
+        list_nonces.append(create_nonces(first_nonces))
+    print("Lista de nonces creados...")
+
     print("Welcome to bit!")
     while True:
         # mined_block = miner(sys.argv[1].encode().hex(), sys.argv[2], df_first_nonce)
 
         mined_block = miner(":Mined by javi784ommig800 Q~c^xM,)bX&amp;gt;{#".encode().hex(),
-                            "tb1q5f2jdp006qp4q0qu8uq0ut0zh8lymwnvafy3rv", df_first_nonce)
+                            "tb1q5f2jdp006qp4q0qu8uq0ut0zh8lymwnvafy3rv", list_nonces)
         # ":binance/8413]nmm}dqԡފ==ډ[BŉQXj"
 
         if mined_block:
