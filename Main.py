@@ -1,32 +1,26 @@
-import math
+# coding=utf-8
+import base64
+import codecs
+import hashlib
+import json
+import os
+import random
+import struct
+import time
 import urllib.request
 import urllib.error
 import urllib.parse
-import base64
-import json
-import hashlib
-import struct
-import random
-import time
-import os
-import sys
-import codecs
-import numpy as np
-import pandas as pd
-import binascii
+
 from binascii import unhexlify
-# from numba import cuda, njit, jit
-import numba
-from numba import cuda, jit, njit
+
+import pandas as pd
 from numpy.compat import long
 
 # JSON-HTTP RPC Configuration
 # This will be particular to your local ~/.bitcoin/bitcoin.conf
-
-
-RPC_URL = os.environ.get("RPC_URL", "http://127.0.0.1:18332")
-RPC_USER = os.environ.get("RPC_USER", "prueba")
-RPC_PASS = os.environ.get("RPC_PASS", "prueba")
+RPC_URL = os.environ.get("RPC_URL", "http://localhost:8332")
+RPC_USER = os.environ.get("RPC_USER", "javi")
+RPC_PASS = os.environ.get("RPC_PASS", "javikat0")
 
 
 ################################################################################
@@ -51,14 +45,14 @@ def rpc(method, params=None):
     request = urllib.request.Request(RPC_URL, data, {"Authorization": "Basic {:s}".format(auth)})
 
     with urllib.request.urlopen(request) as f:
-        response = json.loads(f.read())
+        response2 = json.loads(f.read())
 
-    if response['id'] != rpc_id:
-        raise ValueError("Invalid response id: got {}, expected {:u}".format(response['id'], rpc_id))
-    elif response['error'] is not None:
-        raise ValueError("RPC error: {:s}".format(json.dumps(response['error'])))
+    if response2['id'] != rpc_id:
+        raise ValueError("Invalid response id: got {}, expected {:d}".format(response2['id'], rpc_id))
+    elif response2['error'] is not None:
+        raise ValueError("RPC error: {:s}".format(json.dumps(response2['error'])))
 
-    return response['result']
+    return response2['result']
 
 
 def rpc_getblocktemplate():
@@ -232,19 +226,19 @@ def block_compute_raw_hash(header):
     return hashlib.sha256(hashlib.sha256(header).digest()).digest()[::-1]
 
 
-def tx_encode_coinbase_height(height):
-    """
-    Encode the coinbase height, as per BIP 34:
-    https://github.com/bitcoin/bips/blob/master/bip-0034.mediawiki
-    Arguments:
-        height (int): height of the mined block
-    Returns:
-        string: encoded height as an ASCII hex string
-    """
-
-    width = (height.bit_length() + 7) // 8
-
-    return bytes([width]).hex() + int2lehex(height, width)
+# def tx_encode_coinbase_height(height):
+#     """
+#     Encode the coinbase height, as per BIP 34:
+#     https://github.com/bitcoin/bips/blob/master/bip-0034.mediawiki
+#     Arguments:
+#         height (int): height of the mined block
+#     Returns:
+#         string: encoded height as an ASCII hex string
+#     """
+#
+#     width = (height.bit_length() + 7) // 8
+#
+#     return bytes([width]).hex() + int2lehex(height, width)
 
 
 def tx_make_coinbase(coinbase_script, address, fee, height):
@@ -415,6 +409,7 @@ def create_nonces(first_nonce):
 def search_hash_valid(list_nonces, block_header, target_hash):
     for i in range(len(list_nonces)):
         lista = list_nonces[i]
+        print("{}/{} {}".format(i + 1, len(list_nonces), lista[0]))
         for x in range(len(lista)):
             nonce = lista[x][2:].zfill(8)
             block_header2 = block_header + bytes.fromhex(nonce)
@@ -429,7 +424,7 @@ def search_hash_valid(list_nonces, block_header, target_hash):
 def miner(coinbase_message, address, list_nonces):
     # while True:
     block_template = rpc_getblocktemplate()
-    print("Mining block template, height {:d}...".format(block_template['height']))
+    print("Mining block template, height {:d}.".format(block_template['height']))
     coinbase_tx = {}
     block_template['transactions'].insert(0, coinbase_tx)
     block_template['nonce'] = unhexlify(b"00000000")
@@ -463,8 +458,8 @@ def miner(coinbase_message, address, list_nonces):
 
 
 if __name__ == "__main__":
-    # model = tf.keras.models.load_model('modelo.h5')
-    df_first_nonce = pd.read_csv('frequency_nonce.csv')
+
+    df_first_nonce = pd.read_csv('frequency_nonce_doge.csv', encoding="utf-8")
     # targets = df['nonce']
     # if len(sys.argv) < 3:
     #     print("Usage: {:s} <coinbase message> <block reward address>".format(sys.argv[0]))
@@ -472,17 +467,17 @@ if __name__ == "__main__":
 
     # create list nonces
     list_nonces = []
-    for i in range(len(df_first_nonce)):
+    for i in range(len(df_first_nonce[:10])):
         first_nonces = df_first_nonce.iloc[i][0]
         list_nonces.append(create_nonces(first_nonces))
-    print("Lista de nonces creados...")
+    print("Lista de nonces creados.")
 
     print("Welcome to bit!")
     while True:
         # mined_block = miner(sys.argv[1].encode().hex(), sys.argv[2], df_first_nonce)
         # ":binance/8413]nmm}dqԡފ==ډ[BŉQXj"
-        mined_block = miner(":Mined by javi784ommig800 Q~c^xM,)bX&amp;gt;{#".encode().hex(),
-                            "DSjimaLrFFgwLHxBigNUG2M1L4DK9c2cRt", list_nonces)
+        # mined_block = miner("Mined by javi784ommig800".encode().hex(), "DSjimaLrFFgwLHxBigNUG2M1L4DK9c2cRt", list_nonces)
+        mined_block = miner(":Mined by javi784ommig800 Q~c^xM,)bX&amp;gt;{#".encode().hex(), "DSjimaLrFFgwLHxBigNUG2M1L4DK9c2cRt", list_nonces)
 
         if mined_block:
             print("Solved a block! Block hash: {}".format(mined_block['hash']))
