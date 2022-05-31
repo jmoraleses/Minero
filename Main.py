@@ -1,7 +1,9 @@
 # coding=utf-8
 import base64
+import binascii
 import codecs
 import hashlib
+import scrypt
 import json
 import os
 import random
@@ -10,14 +12,13 @@ import time
 import urllib.request
 import urllib.error
 import urllib.parse
-
 from binascii import unhexlify
-
 import pandas as pd
 from numpy.compat import long
 
 # JSON-HTTP RPC Configuration
 # This will be particular to your local ~/.bitcoin/bitcoin.conf
+
 RPC_URL = os.environ.get("RPC_URL", "http://localhost:8332")
 RPC_USER = os.environ.get("RPC_USER", "javi")
 RPC_PASS = os.environ.get("RPC_PASS", "javikat0")
@@ -407,14 +408,18 @@ def create_nonces(first_nonce):
 
 
 def search_hash_valid(list_nonces, block_header, target_hash):
+    target_hash_hex = binascii.hexlify(target_hash)
     for i in range(len(list_nonces)):
         lista = list_nonces[i]
         print("{}/{} {}".format(i + 1, len(list_nonces), lista[0]))
         for x in range(len(lista)):
             nonce = lista[x][2:].zfill(8)
-            block_header2 = block_header + bytes.fromhex(nonce)
-            block_hash = block_compute_raw_hash(block_header2)
-            if block_hash < target_hash:
+            block_header = block_header + bytes.fromhex(nonce)
+            #scrypt
+            block_hash = binascii.hexlify(scrypt.hash(block_header, block_header, 1024, 1, 1, 32))
+            #sha256
+            # block_hash = block_compute_raw_hash(block_header2) # sha256
+            if block_hash < target_hash_hex:
                 print("Nonce encontrado:")
                 print(nonce)
                 return nonce
