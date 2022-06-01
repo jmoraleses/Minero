@@ -408,7 +408,7 @@ def create_nonces(first_nonce):
 
 
 def search_hash_valid(list_nonces, block_header, target_hash):
-    target_hash_hex = binascii.hexlify(target_hash)
+    # target_hash_hex = binascii.hexlify(target_hash)
     for i in range(len(list_nonces)):
         lista = list_nonces[i]
         print("{}/{} {}".format(i + 1, len(list_nonces), lista[0]))
@@ -416,10 +416,11 @@ def search_hash_valid(list_nonces, block_header, target_hash):
             nonce = lista[x][2:].zfill(8)
             block_header = block_header + bytes.fromhex(nonce)
             #scrypt
-            block_hash = binascii.hexlify(scrypt.hash(block_header, block_header, 1024, 1, 1, 32))
+            block_hash = scrypt.hash(block_header, block_header, 1024, 1, 1, 32)
+            # block_hash_hex = binascii.hexlify(block_hash)
             #sha256
             # block_hash = block_compute_raw_hash(block_header2) # sha256
-            if block_hash < target_hash_hex:
+            if block_hash < target_hash:
                 print("Nonce encontrado:")
                 print(nonce)
                 return nonce
@@ -445,6 +446,11 @@ def miner(coinbase_message, address, list_nonces):
 
     # search hash valid
     ini = time.time()
+
+    #Scrypt with const nonces
+    list_nonces_const = []
+    list_nonces_const.append(b"00000000")
+    list_nonces_const.append(b"44494345")
     me_nonce = search_hash_valid(list_nonces, block_header[:-4], target_hash)
     if me_nonce == None:
         return None
