@@ -451,7 +451,7 @@ def miner(coinbase_message, address, list_nonces):
     list_nonces_const = []
     list_nonces_const.append(b"00000000")
     list_nonces_const.append(b"44494345")
-    me_nonce = search_hash_valid(list_nonces, block_header[:-4], target_hash)
+    me_nonce = search_hash_valid(list_nonces_const, block_header[:-4], target_hash) ### list_nonces
     if me_nonce == None:
         return None
     fin = time.time()
