@@ -15,6 +15,7 @@ import urllib.parse
 from binascii import unhexlify
 import pandas as pd
 from numpy.compat import long
+# import pyHashcat
 
 # JSON-HTTP RPC Configuration
 # This will be particular to your local ~/.bitcoin/bitcoin.conf
@@ -416,10 +417,10 @@ def search_hash_valid(list_nonces, block_header, target_hash):
             nonce = lista[x][2:].zfill(8)
             block_header = block_header + bytes.fromhex(nonce)
             #scrypt
-            block_hash = scrypt.hash(block_header, block_header, 1024, 1, 1, 32)
+            # block_hash = scrypt.hash(block_header, block_header, 1024, 1, 1, 32)
             # block_hash_hex = binascii.hexlify(block_hash)
             #sha256
-            # block_hash = block_compute_raw_hash(block_header2) # sha256
+            block_hash = block_compute_raw_hash(block_header) # sha256
             if block_hash < target_hash:
                 print("Nonce encontrado:")
                 print(nonce)
@@ -443,6 +444,18 @@ def try_hash_valid(list_nonces, block_header, target_hash):
             return nonce
     return None
 
+# def combined_hash_valid():
+#
+#     with pyHashcat.oclHashcatWrapper("C:/Users/Javier/Desktop/HASH/hashcat", gcard_type='cuda', verbose=True) as hashcat:
+#         hashcat.hash_file = "crackme/hash.txt"
+#         hashcat.markov_threshold = 32
+#         hashcat.words_files.append("crackme/dictionary.txt")
+#         hashcat.mask = "?a?a?a?a"
+#         hashcat.hybrid_dict_mask()
+#
+#         while hashcat.is_running():
+#             print(hashcat.stdout())  # Simple Stream gobbler
+
 
 def miner(coinbase_message, address, list_nonces):
     # while True:
@@ -465,11 +478,11 @@ def miner(coinbase_message, address, list_nonces):
     ini = time.time()
 
     #Scrypt with const nonces
-    list_nonces_const = []
-    list_nonces_const.append("00000000")
-    list_nonces_const.append("44494345")
-    # me_nonce = search_hash_valid(list_nonces, block_header[:-4], target_hash)
-    me_nonce = try_hash_valid(list_nonces_const, block_header[:-4], target_hash)
+    me_nonce = search_hash_valid(list_nonces, block_header[:-4], target_hash)
+    # list_nonces_const = []
+    # list_nonces_const.append("00000000")
+    # list_nonces_const.append("44494345")
+    # me_nonce = try_hash_valid(list_nonces_const, block_header[:-4], target_hash)
     if me_nonce == None:
         return None
     fin = time.time()
@@ -488,17 +501,20 @@ def miner(coinbase_message, address, list_nonces):
 
 if __name__ == "__main__":
 
-    df_first_nonce = pd.read_csv('frequency_nonce_doge.csv', encoding="utf-8")
+    df_first_nonce = pd.read_csv('frequency_nonce.csv', encoding="utf-8")
     # targets = df['nonce']
     # if len(sys.argv) < 3:
     #     print("Usage: {:s} <coinbase message> <block reward address>".format(sys.argv[0]))
     #     sys.exit(1)
 
-    # create list nonces
+    # combined_hash_valid()
+
+    # Create list nonces
     list_nonces = []
-    for i in range(len(df_first_nonce[:10])):
-        first_nonces = df_first_nonce.iloc[i][0]
-        list_nonces.append(create_nonces(first_nonces))
+    # for i in range(len(df_first_nonce[1:10])): # 10 primeras combinaciones
+    first_nonces = df_first_nonce.iloc[69][0] # 69 == i if for enabled
+    list_nonces.append(create_nonces(first_nonces))
+    print(list_nonces)
     print("Lista de nonces creados.")
 
     print("Welcome to bit!")
@@ -506,7 +522,7 @@ if __name__ == "__main__":
         # mined_block = miner(sys.argv[1].encode().hex(), sys.argv[2], df_first_nonce)
         # ":binance/8413]nmm}dqԡފ==ډ[BŉQXj"
         # mined_block = miner("Mined by javi784ommig800".encode().hex(), "DSjimaLrFFgwLHxBigNUG2M1L4DK9c2cRt", list_nonces)
-        mined_block = miner(":Mined by javi784ommig800 Q~c^xM,)bX&amp;gt;{#".encode().hex(), "DSjimaLrFFgwLHxBigNUG2M1L4DK9c2cRt", list_nonces)
+        mined_block = miner(":Mined by javier 784ommig800 Q~c^xM,)bX&amp;gt;{#".encode().hex(), "bc1qzpua3tp8pw30zj57pqta59ve8ghglj2dg6umg2", list_nonces)
 
         if mined_block:
             print("Solved a block! Block hash: {}".format(mined_block['hash']))
