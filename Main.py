@@ -1,4 +1,5 @@
 # coding=utf-8
+import timeit
 import base64
 import binascii
 import codecs
@@ -521,18 +522,23 @@ if __name__ == "__main__":
 
     # Create list nonces
     list_nonces = []
-    # for i in range(len(df_first_nonce[1:10])): # 10 primeras combinaciones
-    first_nonces = df_first_nonce.iloc[1][0] # 69 == i if for enabled
-    list_nonces.append(create_nonces(first_nonces, len(first_nonces)))
-    # print(list_nonces)
-    print(first_nonces)
+    cont_nonces = 0
+    total_nonces = 1 # total de nonces a añadir en la lista
+    for i in range(len(df_first_nonce[1:])): # 10 primeras combinaciones
+        first_nonces = df_first_nonce.iloc[i][0] # 1 == i if for enabled
+        if str(first_nonces).startswith("407") and first_nonces not in list_nonces: # guarda únicamente aquellos números que comienzan en 4
+            list_nonces.append(create_nonces(first_nonces, len(first_nonces)))
+            cont_nonces += 1
+            if cont_nonces == total_nonces:
+                break
+    print("longitud de la lista: {}".format(len(list_nonces)))
     # print("Lista de nonces creados.")
 
     #Comprobar velocidad
-    ini = time.time_ns()
+    ini = timeit.default_timer()
     search_hash_time(list_nonces)
-    fin = time.time_ns()
-    print("Ejecución: {} microsegundos ({} milisegundos, {} segundos)".format((fin - ini)/1000,(fin - ini)/1000000,(fin - ini)/1000000000))
+    fin = timeit.default_timer()
+    print("Ejecución: {} segundos, {} milisegundos, {} microsegundos, {} nanosegundos".format((fin - ini), (fin - ini)*1000, (fin - ini)*1000000, (fin - ini)*1000000000))
 
 
     print("Welcome to bit!")
