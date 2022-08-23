@@ -395,9 +395,9 @@ def show_numbers(cor):
     return f
 
 
-def create_nonces(first_nonce):
-    ini_nonce = long(first_nonce.zfill(3) + "00000", 16)
-    fin_nonce = long(first_nonce.zfill(3) + "fffff", 16) + 1
+def create_nonces(first_nonce, num):
+    ini_nonce = long(first_nonce.zfill(3) + "0"*(8 - num), 16)
+    fin_nonce = long(first_nonce.zfill(3) + "f"*(8 - num), 16) + 1
     me_nonce = ini_nonce
     list_nonces = []
     # ini = time.time()
@@ -427,6 +427,16 @@ def search_hash_valid(list_nonces, block_header, target_hash):
                 return nonce
     return None
 
+def search_hash_time(list_nonces):
+    # target_hash_hex = binascii.hexlify(target_hash)
+    for i in range(len(list_nonces)):
+        lista = list_nonces[i]
+        # print("{}/{} {}".format(i + 1, len(list_nonces), lista[0]))
+        # print(len(lista))
+        for x in range(len(lista)):
+            nonce = lista[x][2:].zfill(8)
+            block_hash = block_compute_raw_hash(bytes.fromhex(nonce)) # sha256
+    return None
 
 def try_hash_valid(list_nonces, block_header, target_hash):
     # target_hash_hex = binascii.hexlify(target_hash)
@@ -501,7 +511,7 @@ def miner(coinbase_message, address, list_nonces):
 
 if __name__ == "__main__":
 
-    df_first_nonce = pd.read_csv('frequency_nonce.csv', encoding="utf-8")
+    df_first_nonce = pd.read_csv('frequency_nonce_bitcoin5.csv', encoding="utf-8")
     # targets = df['nonce']
     # if len(sys.argv) < 3:
     #     print("Usage: {:s} <coinbase message> <block reward address>".format(sys.argv[0]))
@@ -512,10 +522,18 @@ if __name__ == "__main__":
     # Create list nonces
     list_nonces = []
     # for i in range(len(df_first_nonce[1:10])): # 10 primeras combinaciones
-    first_nonces = df_first_nonce.iloc[69][0] # 69 == i if for enabled
-    list_nonces.append(create_nonces(first_nonces))
-    print(list_nonces)
-    print("Lista de nonces creados.")
+    first_nonces = df_first_nonce.iloc[1][0] # 69 == i if for enabled
+    list_nonces.append(create_nonces(first_nonces, len(first_nonces)))
+    # print(list_nonces)
+    print(first_nonces)
+    # print("Lista de nonces creados.")
+
+    #Comprobar velocidad
+    ini = time.time_ns()
+    search_hash_time(list_nonces)
+    fin = time.time_ns()
+    print("Ejecución: {} microsegundos ({} milisegundos, {} segundos)".format((fin - ini)/1000,(fin - ini)/1000000,(fin - ini)/1000000000))
+
 
     print("Welcome to bit!")
     while True:
