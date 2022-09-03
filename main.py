@@ -25,8 +25,8 @@ from threading import Thread
 # This will be particular to your local ~/.bitcoin/bitcoin.conf
 
 RPC_URL = os.environ.get("RPC_URL", "http://localhost:8332")
-RPC_USER = os.environ.get("RPC_USER", "javi")
-RPC_PASS = os.environ.get("RPC_PASS", "javisuperkat")
+RPC_USER = os.environ.get("RPC_USER", "user")
+RPC_PASS = os.environ.get("RPC_PASS", "pass")
 
 
 ################################################################################
