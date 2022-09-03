@@ -1,29 +1,32 @@
 # coding=utf-8
+import ctypes
+import multiprocessing
+import threading
 import timeit
 import base64
 import binascii
 import codecs
 import hashlib
-import scrypt
+# import scrypt
 import json
 import os
 import random
 import struct
 import time
 import urllib.request
-import urllib.error
-import urllib.parse
 from binascii import unhexlify
+from multiprocessing import Process
+
 import pandas as pd
 from numpy.compat import long
-# import pyHashcat
+from threading import Thread
 
 # JSON-HTTP RPC Configuration
 # This will be particular to your local ~/.bitcoin/bitcoin.conf
 
 RPC_URL = os.environ.get("RPC_URL", "http://localhost:8332")
 RPC_USER = os.environ.get("RPC_USER", "javi")
-RPC_PASS = os.environ.get("RPC_PASS", "javikat0")
+RPC_PASS = os.environ.get("RPC_PASS", "javisuperkat")
 
 
 ################################################################################
@@ -45,9 +48,9 @@ def rpc(method, params=None):
     data = json.dumps({"id": rpc_id, "method": method, "params": params}).encode()
     auth = base64.encodebytes((RPC_USER + ":" + RPC_PASS).encode()).decode().strip()
 
-    request = urllib.request.Request(RPC_URL, data, {"Authorization": "Basic {:s}".format(auth)})
+    requests = urllib.request.Request(RPC_URL, data, {"Authorization": "Basic {:s}".format(auth)})
 
-    with urllib.request.urlopen(request) as f:
+    with urllib.request.urlopen(requests) as f:
         response2 = json.loads(f.read())
 
     if response2['id'] != rpc_id:
@@ -408,68 +411,41 @@ def create_nonces(first_nonce, num):
         me_nonce += 1
     return list_nonces
 
-
-def search_hash_valid(list_nonces, block_header, target_hash):
+def search_hash_valid(list_nonces, block_header0, target_hash, variable):
     # target_hash_hex = binascii.hexlify(target_hash)
-    for i in range(len(list_nonces)):
-        lista = list_nonces[i]
-        print("{}/{} {}".format(i + 1, len(list_nonces), lista[0]))
-        for x in range(len(lista)):
-            nonce = lista[x][2:].zfill(8)
-            block_header = block_header + bytes.fromhex(nonce)
-            #scrypt
-            # block_hash = scrypt.hash(block_header, block_header, 1024, 1, 1, 32)
-            # block_hash_hex = binascii.hexlify(block_hash)
-            #sha256
-            block_hash = block_compute_raw_hash(block_header) # sha256
-            if block_hash < target_hash:
-                print("Nonce encontrado:")
-                print(nonce)
-                return nonce
+    for nonce in list_nonces:
+        # print("{}".format(nonce))
+        block_header = block_header0 + bytes.fromhex(nonce)
+        block_hash = block_compute_raw_hash(block_header)
+        if block_hash < target_hash:
+            print("Nonce encontrado: {}".format(nonce))
+            # sleep(nonce)
+            variable.value = nonce
+            return nonce
+    # variable.value = "00000000"
+    return None
+
+def _search_hash_valid(list_nonces, block_header0, target_hash):
+    # target_hash_hex = binascii.hexlify(target_hash)
+    for nonce in list_nonces:
+        # print("{}".format(nonce))
+        block_header = block_header0 + bytes.fromhex(nonce)
+        block_hash = block_compute_raw_hash(block_header)
+        if block_hash < target_hash:
+            print("Nonce encontrado: {}".format(nonce))
+            return nonce
     return None
 
 def search_hash_time(list_nonces):
     # target_hash_hex = binascii.hexlify(target_hash)
-    for i in range(len(list_nonces)):
-        lista = list_nonces[i]
-        # print("{}/{} {}".format(i + 1, len(list_nonces), lista[0]))
-        # print(len(lista))
-        for x in range(len(lista)):
-            nonce = lista[x][2:].zfill(8)
-            block_hash = block_compute_raw_hash(bytes.fromhex(nonce)) # sha256
+    for nonce in list_nonces:
+        block_hash = block_compute_raw_hash(nonce.encode('utf-8')) # sha256
     return None
-
-def try_hash_valid(list_nonces, block_header, target_hash):
-    # target_hash_hex = binascii.hexlify(target_hash)
-    for i in range(len(list_nonces)):
-        nonce = list_nonces[i]
-        block_header = block_header + bytes.fromhex(nonce)
-        #scrypt
-        block_hash = scrypt.hash(block_header, block_header, 1024, 1, 1, 32)
-        # block_hash_hex = binascii.hexlify(block_hash)
-        #sha256
-        # block_hash = block_compute_raw_hash(block_header2) # sha256
-        if block_hash < target_hash:
-            print("Nonce encontrado:")
-            print(nonce)
-            return nonce
-    return None
-
-# def combined_hash_valid():
-#
-#     with pyHashcat.oclHashcatWrapper("C:/Users/Javier/Desktop/HASH/hashcat", gcard_type='cuda', verbose=True) as hashcat:
-#         hashcat.hash_file = "crackme/hash.txt"
-#         hashcat.markov_threshold = 32
-#         hashcat.words_files.append("crackme/dictionary.txt")
-#         hashcat.mask = "?a?a?a?a"
-#         hashcat.hybrid_dict_mask()
-#
-#         while hashcat.is_running():
-#             print(hashcat.stdout())  # Simple Stream gobbler
 
 
 def miner(coinbase_message, address, list_nonces):
     # while True:
+    global mined_block
     block_template = rpc_getblocktemplate()
     print("Mining block template, height {:d}.".format(block_template['height']))
     coinbase_tx = {}
@@ -485,74 +461,72 @@ def miner(coinbase_message, address, list_nonces):
     # my_block_header = str(block_header.hex())
     # print(my_block_header)
 
-    # search hash valid
-    ini = time.time()
+    # Search hash valid multithread
+    # ini = time.time()
+    ini = timeit.default_timer()
+    # manager = multiprocessing.Manager()
+    # variable = manager.Value(ctypes.c_wchar, "00000000")
+    # # process = Process(target=search_hash_valid, args=(list_nonces, block_header[:-4], target_hash, variable,))
+    # # process.start()
+    # threads = Thread(target=search_hash_valid, args=[list_nonces, block_header[:-4], target_hash, variable])
+    # threads.start()
+    # nonce = str(variable.value)
+    nonce = _search_hash_valid(list_nonces, block_header[:-4], target_hash)
+    # fin = time.time()
+    fin = timeit.default_timer()
+    print("Ejecución finalizada: {}".format(fin - ini))
 
-    #Scrypt with const nonces
-    me_nonce = search_hash_valid(list_nonces, block_header[:-4], target_hash)
-    # list_nonces_const = []
-    # list_nonces_const.append("00000000")
-    # list_nonces_const.append("44494345")
-    # me_nonce = try_hash_valid(list_nonces_const, block_header[:-4], target_hash)
-    if me_nonce == None:
-        return None
-    fin = time.time()
-    print("Ejecución: {}".format(fin - ini))
-
-    block_header = block_header[:-4] + bytes.fromhex(me_nonce)
-    block_hash = block_compute_raw_hash(block_header)
-    # print(codecs.encode(block_header, "hex").decode())
-    # print(codecs.encode(block_hash, "hex").decode())
-    # print()
-    if block_hash < target_hash:
-        block_template['nonce'] = me_nonce
+    if nonce != "00000000" and nonce != None:
+        print(nonce)
+        block_header = block_header[:-4] + bytes.fromhex(nonce)
+        # print(codecs.encode(block_header, "hex").decode())
+        block_hash = block_compute_raw_hash(block_header)
+        # print(codecs.encode(block_hash, "hex").decode())
+        block_template['nonce'] = unhexlify(nonce) ###
         block_template['hash'] = block_hash.hex()
         return block_template
+
+    return None
+
 
 
 if __name__ == "__main__":
 
-    df_first_nonce = pd.read_csv('frequency_nonce_bitcoin5.csv', encoding="utf-8")
-    # targets = df['nonce']
-    # if len(sys.argv) < 3:
-    #     print("Usage: {:s} <coinbase message> <block reward address>".format(sys.argv[0]))
-    #     sys.exit(1)
+    df = pd.read_csv('lista_combinaciones.csv', encoding="utf-8")
 
-    # combined_hash_valid()
+    # # targets = df['nonce']
+    # # if len(sys.argv) < 3:
+    # #     print("Usage: {:s} <coinbase message> <block reward address>".format(sys.argv[0]))
+    # #     sys.exit(1)
+    #
 
-    # Create list nonces
-    list_nonces = []
-    cont_nonces = 0
-    total_nonces = 1 # total de nonces a añadir en la lista
-    for i in range(len(df_first_nonce[1:])): # 10 primeras combinaciones
-        first_nonces = df_first_nonce.iloc[i][0] # 1 == i if for enabled
-        if str(first_nonces).startswith("407") and first_nonces not in list_nonces: # guarda únicamente aquellos números que comienzan en 4
-            list_nonces.append(create_nonces(first_nonces, len(first_nonces)))
-            cont_nonces += 1
-            if cont_nonces == total_nonces:
-                break
-    print("longitud de la lista: {}".format(len(list_nonces)))
-    # print("Lista de nonces creados.")
+    print("longitud de la lista: {}".format(len(df)))
 
     #Comprobar velocidad
-    ini = timeit.default_timer()
-    search_hash_time(list_nonces)
-    fin = timeit.default_timer()
-    print("Ejecución: {} segundos, {} milisegundos, {} microsegundos, {} nanosegundos".format((fin - ini), (fin - ini)*1000, (fin - ini)*1000000, (fin - ini)*1000000000))
+    # ini = time.time()
+    # ini = timeit.default_timer()
+    # simplethread = threading.Thread(target=search_hash_time, args=[set(df['comb'])])
+    # simplethread.start()
+    # # search_hash_time(set(df['comb']))
+    # fin = timeit.default_timer()
+    # # fin = time.time()
+    # print("Ejecución: {} segundos, {} milisegundos, {} microsegundos, {} nanosegundos".format((fin - ini), (fin - ini)*1000, (fin - ini)*1000000, (fin - ini)*1000000000))
 
 
     print("Welcome to bit!")
+    list_nonces = df['comb'].to_list()
+    coinbase_message = "Mined by ...".encode().hex()
+    address = "bc1qx54qtwyltts7cmfgkrzamyl4qwyk6xc3du4nhm"
     while True:
         # mined_block = miner(sys.argv[1].encode().hex(), sys.argv[2], df_first_nonce)
-        # ":binance/8413]nmm}dqԡފ==ډ[BŉQXj"
-        # mined_block = miner("Mined by javi784ommig800".encode().hex(), "DSjimaLrFFgwLHxBigNUG2M1L4DK9c2cRt", list_nonces)
-        mined_block = miner(":Mined by javier 784ommig800 Q~c^xM,)bX&amp;gt;{#".encode().hex(), "bc1qzpua3tp8pw30zj57pqta59ve8ghglj2dg6umg2", list_nonces)
+
+        mined_block = miner(coinbase_message, address, list_nonces)
 
         if mined_block:
             print("Solved a block! Block hash: {}".format(mined_block['hash']))
             submission = block_make_submit(mined_block)
 
-            print("Submitting:", submission, "\n")
+            # print("Submitting:", submission, "\n")
             response = rpc_submitblock(submission)
             if response is not None:
                 print("Submission Error: {}".format(response))
