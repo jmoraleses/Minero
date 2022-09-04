@@ -527,8 +527,8 @@ async def main():
     # y = args.range
 
     x = 0
-    y = 30240
-    df = df.iloc[:30240]
+    y = len(df)
+    df = df.iloc[:y]
     # print("longitud de la lista: {}".format(len(df)))
 
     #Comprobar velocidad
