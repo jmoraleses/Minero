@@ -31,8 +31,8 @@ import async_timeout
 # This will be particular to your local ~/.bitcoin/bitcoin.conf
 
 RPC_URL = os.environ.get("RPC_URL", "http://localhost:8332")
-RPC_USER = os.environ.get("RPC_USER", "usuariojavi")
-RPC_PASS = os.environ.get("RPC_PASS", "concertjavi0")
+RPC_USER = os.environ.get("RPC_USER", "")
+RPC_PASS = os.environ.get("RPC_PASS", "")
 
 
 ################################################################################
