@@ -31,8 +31,8 @@ import async_timeout
 # This will be particular to your local ~/.bitcoin/bitcoin.conf
 
 RPC_URL = os.environ.get("RPC_URL", "http://localhost:8332")
-RPC_USER = os.environ.get("RPC_USER", "")
-RPC_PASS = os.environ.get("RPC_PASS", "")
+RPC_USER = os.environ.get("RPC_USER", "user")
+RPC_PASS = os.environ.get("RPC_PASS", "pass")
 
 
 ################################################################################
@@ -108,9 +108,27 @@ def tx_compute_merkle_root(tx_hashes):
             tx_hashes_new.append(concat_hash)
 
         tx_hashes = tx_hashes_new
-
+    # print(tx_hashes[0][::-1].hex())
     # Format the root in big endian ascii hex
-    return tx_hashes[0][::-1].hex()
+    return str(tx_hashes[0][::-1].hex())
+
+
+def sha256(data):
+    return hashlib.sha256(data).digest()
+
+def sha256d(data):
+    return sha256(sha256(data))
+
+# def get_merkle_root(transactions):
+#     branches = [bytes.fromhex(tx_hash)[::-1] for tx_hash in transactions]
+#
+#     while len(branches) > 1:
+#         if (len(branches) % 2) == 1:
+#             branches.append(branches[-1])
+#
+#         branches = [sha256d(a + b) for (a, b) in zip(branches[0::2], branches[1::2])]
+#
+#     return branches[0][::-1].hex()
 
 
 def block_bits2target(bits):
@@ -268,7 +286,7 @@ def tx_make_coinbase(coinbase_script, address, fee, height):
 
     # See https://en.bitcoin.it/wiki/Transaction
 
-    version = 1
+    # version = 2
     coinbase_script = tx_encode_coinbase_height(height) + coinbase_script
 
     # Create a pubkey script
@@ -277,9 +295,9 @@ def tx_make_coinbase(coinbase_script, address, fee, height):
 
     tx = ""
     # version
-    tx += int2lehex(version, 4)
+    tx += "01000000" #int2lehex(version, 4)
     # in-counter
-    tx += "000101"
+    tx += "01" #"000101"
     # input[0] prev hash
     tx += "0" * 64
     # input[0] prev seqnum
@@ -326,16 +344,15 @@ def block_make_header(block):
     # Target Bits
     header += bytes.fromhex(block['bits'])[::-1]
     # Nonce
-    header += block['nonce']  # struct.pack("<L", block['nonce'])
+
+    header += struct.pack("<L", block['nonce'])
 
     return header
 
 
-def to_do_coinbase_message(message, height):
+def to_coinbase_script(message):
     coinbase_byte = message.encode('ascii')
-    coinbase_message = codecs.encode(coinbase_byte, "hex")
-    coinbase_script = coinbase_message.decode('ascii')
-    scriptsig = tx_encode_coinbase_height(height) + coinbase_script
+    scriptsig = unhexlify(coinbase_byte).hex()
     return scriptsig
 
 
@@ -418,32 +435,6 @@ def create_nonces(first_nonce, num):
         me_nonce += 1
     return list_nonces
 
-def df_search_hash_valid(df, block_header0, target_hash, results, n):
-    df = df.iloc[n:n + 16]
-    for i in range(len(df)):
-        nonce = df.iloc[i]['comb']
-        # print("{}. {}".format(n+i, nonce))
-        block_header = block_header0 + bytes.fromhex(nonce)
-        block_hash = block_compute_raw_hash(block_header)
-        if block_hash < target_hash:
-            print("Nonce encontrado: {}".format(nonce))
-            # sleep(nonce)
-            results[i] = nonce
-            # variable.value = nonce
-            return nonce
-    # results[i] = None
-    return None
-
-def search_hash_valid(df, block_header0, target_hash, x, r):
-    df = df.iloc[x:x + r]['comb']
-    for nonce in df:
-        # print("{}".format(nonce))
-        block_header = block_header0 + bytes.fromhex(nonce)
-        block_hash = block_compute_raw_hash(block_header)
-        if block_hash < target_hash:
-            print("Nonce encontrado: {}".format(nonce))
-            return nonce
-    return None
 
 def search_hash_time(list_nonces):
     # target_hash_hex = binascii.hexlify(target_hash)
@@ -453,70 +444,40 @@ def search_hash_time(list_nonces):
 
 
 def miner(block_template, coinbase_message, address, df, x, y):
-    # print(block_template['height'])
-    # while True:
-    # loop.run_until_complete(task_obj)
-    # block_template = task_obj.result()
-    # print(block_template)
-    # print("Mining block template, height {:d}.".format(block_template['height']))
+    df = df.iloc[x:x + y]['comb']
     coinbase_tx = {}
     block_template['transactions'].insert(0, coinbase_tx)
-    block_template['nonce'] = unhexlify(b"00000000")
+    block_template['nonce'] = 0
     target_hash = block_bits2target(block_template['bits'])
-    coinbase_script = to_do_coinbase_message(coinbase_message, block_template['height'])
-    coinbase_tx['data'] = tx_make_coinbase(coinbase_script, address, block_template['coinbasevalue'],
-                                           block_template['height'])
+    extranonce = 13
+
+    # while extranonce <= 0xffffffff:
+    coinbase_script = to_coinbase_script(coinbase_message) + int2lehex(extranonce, 4)
+    coinbase_tx['data'] = tx_make_coinbase(coinbase_script, address, block_template['coinbasevalue'], block_template['height'])
     coinbase_tx['hash'] = tx_compute_hash(coinbase_tx['data'])
     block_template['merkleroot'] = tx_compute_merkle_root([tx['hash'] for tx in block_template['transactions']])
-    block_header = block_make_header(block_template)
-    # my_block_header = str(block_header.hex())
-    # print(my_block_header)
+    _block_header = block_make_header(block_template)
 
-    # Search hash valid multithread
-    ini = time.time()
-    # ini = timeit.default_timer()
-    # manager = multiprocessing.Manager()
-    # variable = manager.Value(ctypes.c_wchar, "00000000")
-    # # process = Process(target=search_hash_valid, args=(list_nonces, block_header[:-4], target_hash, variable,))
-    # # process.start()
-    # threads = threading.Thread(target=_search_hash_valid, args=[list_nonces, block_header[:-4], target_hash])
-    # threads.start()
-    # results = [None] * 1
-    # for i in range(1, len(df)-1, 16):
-    #     threads = Thread(target=df_search_hash_valid, args=[df, block_header[:-4], target_hash, results, i])
-    #     threads.start()
-    nonce = search_hash_valid(df, block_header[:-4], target_hash, x, y)
-    fin = time.time()
-    # fin = timeit.default_timer()
-    # if x % 10 == 0:
-    # print("Ejecución finalizada: {}".format(fin - ini))
-
-    if nonce is not None:
-        # nonce = results[0]
-        print(nonce)
-        block_header = block_header[:-4] + bytes.fromhex(nonce)
-        # print(codecs.encode(block_header, "hex").decode())
+    for nonce in df:
+        block_header = _block_header[0:76] + int(nonce.encode(encoding='utf-8'), 16).to_bytes(4, byteorder='little')
         block_hash = block_compute_raw_hash(block_header)
-        # print(codecs.encode(block_hash, "hex").decode())
-        block_template['nonce'] = unhexlify(nonce) ###
-        block_template['hash'] = block_hash.hex()
-        # return block_template
-
-        print("Solved a block! Block hash: {}".format(block_template['hash']))
-        submission = block_make_submit(block_template)
-        # print("Submitting:", submission, "\n")
-        response = rpc_submitblock(submission)
-        if response is not None:
-            print("Submission Error: {}".format(response))
-            # break
-        return True
-        # loop.stop()
+        if block_hash < target_hash:
+            block_template['nonce'] = int(nonce, 16)
+            block_template['hash'] = block_hash.hex()
+            print("Solved a block! Block hash: {}".format(block_template['hash']))
+            submission = block_make_submit(block_template)
+            # print("Submitting:", submission, "\n")
+            response = rpc_submitblock(submission)
+            if response is not None:
+                print("Submission Error: {}".format(response))
+                # break
+            print(block_template["hash"])
+            return block_template['hash']
+    # extranonce += 1
     return None
 
-
-
 async def main():
-    # print("Welcome to breaking bitcoin!")
+    print("Welcome to breaking bitcoin!")
     df = pd.read_csv('lista_combinaciones_general.csv', encoding="utf-8")
 
     # parser = argparse.ArgumentParser(description='Breaking bitcoin.')
@@ -527,61 +488,20 @@ async def main():
     # y = args.range
 
     x = 0
-    y = 30240
-    df = df.iloc[:30240]
-    # print("longitud de la lista: {}".format(len(df)))
+    y = 1000000
+    df = df.iloc[:y]
 
-    #Comprobar velocidad
-    # ini = time.time()
-    # ini = timeit.default_timer()
-    # simplethread = threading.Thread(target=search_hash_time, args=[set(df['comb'])])
-    # simplethread.start()
-    # # search_hash_time(set(df['comb']))
-    # fin = timeit.default_timer()
-    # # fin = time.time()
-    # print("Ejecución: {} segundos, {} milisegundos, {} microsegundos, {} nanosegundos".format((fin - ini), (fin - ini)*1000, (fin - ini)*1000000, (fin - ini)*1000000000))
-
-
-
-    # list_nonces = df['comb'].to_list()
-    coinbase_message = "Mined by ...".encode().hex()
-    address = "bc1qx54qtwyltts7cmfgkrzamyl4qwyk6xc3du4nhm"
-    # print("lista: {} a {}".format(pos_cifras, pos_cifras+len(df)))
-    # while True:
-
-    # loop = asyncio.get_event_loop()
-    # # try:
-    # task_rpc = loop.create_task(rpc_getblocktemplate(seconds=0.01))
-    # loop.run_until_complete(task_rpc)
-    # await task_rpc
-
-    # loop.call_soon(functools.partial(miner, loop, task_obj.result(), coinbase_message, address, df, x, y))
-    # loop.run_forever()
-
+    coinbase_message = "###Mined by ...@".encode().hex()
+    address = "your_address_here"
     mined_block = None
-    # try:
+
     while mined_block is None:
         ini0 = time.time()
         block_template = await rpc_getblocktemplate()
         mined_block = miner(block_template, coinbase_message, address, df, x, y)
         fin0 = time.time()
         print("Minado en: {}, altura: {}".format(fin0 - ini0, block_template['height']))
-
-    # finally:
-    #     print("Congratulation!")
-
-        # loop.close()
-        # loop.close()
-    #     if mined_block:
-    #         print("Solved a block! Block hash: {}".format(mined_block['hash']))
-    #         submission = block_make_submit(mined_block)
-    #         # print("Submitting:", submission, "\n")
-    #         response = rpc_submitblock(submission)
-    #         loop.close()
-    #         if response is not None:
-    #             print("Submission Error: {}".format(response))
-    #             # break
-
+    print("Felicidades!\n{}".format(mined_block))
 
 if __name__ == "__main__":
     asyncio.run(main())
