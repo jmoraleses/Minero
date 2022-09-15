@@ -1,5 +1,5 @@
 # coding=utf-8
-import asyncio
+#import asyncio
 import base64
 import hashlib
 import json
@@ -22,8 +22,8 @@ from datetime import datetime
 # This will be particular to your local ~/.bitcoin/bitcoin.conf
 
 RPC_URL = os.environ.get("RPC_URL", "http://localhost:8332")
-RPC_USER = os.environ.get("RPC_USER", "javimina0")
-RPC_PASS = os.environ.get("RPC_PASS", "javiminabitcoins0")
+RPC_USER = os.environ.get("RPC_USER", "")
+RPC_PASS = os.environ.get("RPC_PASS", "")
 
 
 ################################################################################
@@ -63,9 +63,8 @@ def rpc(method, params):
 # async def rpc_getblocktemplate():
 def rpc_getblocktemplate():
     try:
-        # await asyncio.sleep(seconds)
         return rpc("getblocktemplate", [{"rules": ["segwit"]}])
-        # return rpc("getblocktemplate", [{"rules": ["segwit"]}])
+        # return await rpc("getblocktemplate", [{"rules": ["segwit"]}])
     except ValueError:
         return {}
 
@@ -380,7 +379,6 @@ def mining(nonce, extranonce):
     mess = __mess
     address = __address
 
-
     # print('/SOLO Mined #' + mess + '/' + message)
     coinbase_message = ('/SOLO Mined #' + mess + '/' + message).encode().hex()
     coinbase_tx = {}
@@ -388,7 +386,6 @@ def mining(nonce, extranonce):
     block_template['nonce'] = 0
     target_hash = block_bits2target(block_template['bits'])
 
-    # extranonce = str(extranonce) #str(extranonce_x) #+ str(extranonce_i)#.zfill(2)
     coinbase_script = to_coinbase_script(coinbase_message) + int2lehex(extranonce, 4)
     coinbase_tx['data'] = tx_make_coinbase(coinbase_script, address, block_template['coinbasevalue'],
                                            block_template['height'])
@@ -480,11 +477,9 @@ def main():
           "## Welcome to breaking bitcoin ##\n"
           "#################################\n")
 
-
     df_nonce = pd.read_csv('freq_nonce.csv', encoding="utf-8")
     df_extranonce = pd.read_csv('freq_extranonce.csv', encoding="utf-8")
-    df_nonce['comb'] = df_nonce['comb'].apply(lambda x: np.compat.long(x, 16))
-
+    df_nonce['comb'] = df_nonce['comb'].apply(lambda x: np.compat.long(x, 16)) #optional
 
     url = ""
     while len(str(url)) == 0:
@@ -492,21 +487,18 @@ def main():
         if url == "":
             url = "http://localhost:8332"
 
-    # user = ""
-    # while len(str(user)) == 0:
-    #     user = input('Introduce el usuario RPC: ')
-    #
-    # password = ""
-    # while len(str(password)) == 0:
-    #     password = input('Introduce la pasword RPC: ')
-    #
-
-
-    # global RPC_USER
-    # global RPC_PASS
+    user = ""
+    while len(str(user)) == 0:
+        user = input('Introduce el usuario RPC: ')
+    
+    password = ""
+    while len(str(password)) == 0:
+        password = input('Introduce la pasword RPC: ')
+    
+    
     RPC_URL = os.environ.get("RPC_URL", url)
-    # RPC_USER = os.environ.get("RPC_USER", user)
-    # RPC_PASS = os.environ.get("RPC_PASS", password)
+    RPC_USER = os.environ.get("RPC_USER", user)
+    RPC_PASS = os.environ.get("RPC_PASS", password)
 
     # nonce
     use_nonce = ""
@@ -530,7 +522,6 @@ def main():
             x_nonce = random.randint(0, len(df_nonce)-int(y_nonce))
             df_nonce = df_nonce.iloc[np.random.permutation(len(df_nonce))]
             df_nonce = df_nonce.iloc[x_nonce:int(x_nonce) + int(y_nonce)]['comb']
-            # df_nonce = df_nonce.iloc[x_nonce:len(df_nonce) - int(x_nonce)]['comb']
         else:
             df_nonce = df_nonce.iloc[0:int(y_nonce)]['comb']
 
@@ -568,7 +559,6 @@ def main():
             x_extranonce = random.randint(0, len(df_extranonce) - int(y_extranonce))
             df_extranonce = df_extranonce.iloc[np.random.permutation(len(df_extranonce))]
             df_extranonce = df_extranonce.iloc[x_extranonce:int(x_extranonce) + int(y_extranonce)]['extranonce']
-            # df_extranonce = df_extranonce.iloc[x_extranonce:len(df_extranonce) - int(x_extranonce)]['extranonce']
         else:
             df_extranonce = df_extranonce.iloc[0:int(y_extranonce)]['extranonce']
 
@@ -587,29 +577,21 @@ def main():
     mess = ""
     while str(mess) == "":
         mess = input('Introduce una frase de minado: ')
-    # coinbase_message = message.encode().hex()
 
     size_message = -1
     while str(size_message) == "" or int(size_message) < 1:
         size_message = input('cantidad de mensajes: (min=1) ')
 
 
-    # address = ""
-    # while str(address) == "":
-    #     address = input('Introduce tu dirección de bitcoin: ')
-
-    address = "bc1qx54qtwyltts7cmfgkrzamyl4qwyk6xc3du4nhm"
+    address = ""
+    while str(address) == "":
+        address = input('Introduce tu dirección de bitcoin: ')
 
 
     mined_block = None
     while mined_block is None:
 
-        # manager = multiprocessing.Manager()
-        # dictionary = manager.dict()
         block_template = rpc_getblocktemplate()
-        # dictionary['block_template'] = await rpc_getblocktemplate()
-        # dictionary['message'] = message
-        # dictionary['address'] = address
 
         if sys.platform.__contains__("win"):
             plat = "cls"
@@ -617,10 +599,6 @@ def main():
             plat = "clear"
         # ini = time.time()
         ini = timeit.default_timer()
-
-
-        # executor = ProcessPoolExecutor(max_workers=12, initializer=set_global, initargs=(block_template, message, address,))
-        # executor = ThreadPoolExecutor(max_workers=np.compat.long(len(df_nonce)*len(df_extranonce)), initializer=set_global, initargs=(block_template, message, address,))
 
         with ProcessPoolExecutor(max_workers=12, initializer=set_global, initargs=(block_template, mess, address, df_nonce, df_extranonce,)) as executor:
             futures = [executor.submit(working, lon) for lon in range(int(size_message))]
